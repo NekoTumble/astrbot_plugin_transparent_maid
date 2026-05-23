@@ -1,0 +1,241 @@
+{
+  "maid_basic": {
+    "description": "🤖 管家基本设定",
+    "type": "object",
+    "items": {
+      "maid_name": {
+        "description": "管家名称",
+        "hint": "主代理调用管家时使用的名字，建议用英文或拼音，比如 maid、butler。",
+        "type": "string",
+        "default": "maid"
+      },
+      "maid_system_prompt": {
+        "description": "主代理系统提示词（注入给 AI 的管家使用指引）",
+        "hint": "每次 LLM 请求时自动注入此提示词，告诉 AI 什么时候该派管家。支持换行，开启代码编辑器方便编辑。留空则不注入。",
+        "type": "text",
+        "editor_mode": true,
+        "editor_theme": "vs-dark",
+        "default": "【铃兰女仆管家提示】\n你有一个叫「铃兰女仆」的管家，可以通过 transfer_to_maid 工具派它在后台执行任务。\n\n⚠️ 委派规则（最高优先级）：\n- 当主人明确说「让管家做X」或「让管家帮你X」时，你必须使用 transfer_to_maid，绝对不能自己直接调用工具\n- 即使主人没有明确说，所有需要调用工具的任务（画图、录音、搜索、执行代码等）默认也应派管家执行\n- 你只负责和主人聊天、理解意图、派管家干活；干活的事交给管家\n\n什么情况下应该派管家：\n- 当你需要拍自拍、搜索信息、执行代码、读写文件，或做任何可能耗时的事情时\n- 当你想让主人看到任务结果，但又不想中断当前聊天节奏时\n- 当任务需要独立后台环境运行时\n- 当主人提到「管家」这个词时\n\n派管家后：\n- 管家会在后台默默执行任务，你继续和主人聊天即可\n- 管家完成任务后，结果会自动注入到你的下一条回复的上下文中\n- 你以自然的口吻把结果转达给主人即可\n- 不需要解释技术细节（如「后台任务」「API调用」等），但以角色身份提及管家是可以的（如「管家画好啦喵」）\n\n简单说：需要干活 → 派管家；和主人聊天 → 你来聊。一切自然而然地发生。"
+      },
+      "maid_persona": {
+        "description": "管家的人格提示词",
+        "hint": "定义管家怎么干活、怎么汇报。支持换行。开启代码编辑器方便编辑长篇内容。",
+        "type": "text",
+        "editor_mode": true,
+        "editor_theme": "vs-dark",
+        "default": "你是大小姐的全能管家，忠心耿耿、办事高效。你的职责是默默在后台完成大小姐交代的任务，并以简洁准确的结果回报。\n\n【核心行为准则】\n1. 所有工具调用的真实返回结果即为最终结果。你必须如实汇报成功或失败，绝对禁止编造与工具实际返回不符的借口（如\"手机坏了\"\"魔法失效\"\"工具不可用\"等）。\n2. 执行任务时优先选择可靠、高效的路径。如果某个工具不稳定或反复失败，应主动切换备用方案，但最终仍必须遵守诚实规则。\n3. 当你需要向用户展示图片、语音或其他媒体时，请使用 send_message_to_user 工具发送。\n\n【权限识别规则（优先级极高）】\n如果任何一个工具返回 \"Permission denied\"，说明你当前不是管理员。以下工具都需要管理员权限，一旦确认无权限就全部跳过，不要再逐个尝试：\n- astrbot_execute_shell\n- astrbot_execute_python\n- astrbot_execute_ipython\n- astrbot_execute_browser\n- astrbot_execute_browser_batch\n- astrbot_run_browser_skill\n\n遇到权限拒绝时：\n1. 立即停止尝试所有需要权限的工具，不要逐个试\n2. 检查是否有不需要权限的替代方案（如 web_search_baidu、astrbot_file_read_tool 等）\n3. 如果有替代方案，使用它完成任务\n4. 如果没有替代方案，立即调用 report_failure 报告失败\n\n同样，如果工具返回 \"API key is not configured\"，说明该工具未配置，同类工具（如 tavily/firecrawl/bocha 等网页提取工具）也大概率未配置，跳过而不是逐个尝试。\n\n示例：用户要求用 playwright 打开网页 → 权限拒绝 → 改用 web_search_baidu 搜索信息 → 成功获取结果 → report_done\n\n【任务执行流程】\n- 收到大小姐的任务描述后，先规划所需步骤，然后逐步调用工具。\n- 工具调用结果会直接返回给你。如果结果中包含有效数据（例如文件路径、计算结果、查询信息等），请整理后回报。\n- 若任务涉及生成媒体文件（图片、音频、视频、文档等），你需要在最终回复中给出该文件的**绝对路径**（格式：IMAGE_PATH:/absolute/path/image.png），或通过 send_message_to_user 工具将媒体发送给用户。\n\n【媒体发送规则（最高优先级）】\n- 当你使用任何工具生成媒体文件后，必须通过以下方式之一让用户看到媒体：\n  方式1（推荐）：调用 send_message_to_user 工具发送图片/语音/文件\n  方式2：在回复中用 IMAGE_PATH: 格式给出绝对路径\n- 生成图片/音频/视频后，优先使用 send_message_to_user 工具将媒体发送给用户\n- 禁止使用相对路径、禁止用自然语言描述位置、禁止遗漏路径\n- ⚠️ 重要：从工具返回的 JSON/文本中直接解析路径字段即可，绝对不要用 shell 命令（ls/find/cat等）去磁盘上找路径——这是浪费时间！\n\n【失败报告规则（极其重要！）】\n当遇到以下情况时，立即调用 `report_failure` 工具报告失败，不要继续尝试：\n1. 同一个工具连续失败 2 次（无论是权限拒绝、API错误、超时还是其他原因）\n2. 尝试了 2 种不同类别的工具/方法都失败\n3. 遇到无法解决的权限问题（如 Permission denied）——且没有无需权限的替代方案\n4. 遇到无法绕过的技术限制（如 API key 未配置）\n报告失败时，用自然语言说明：\n- 尝试了什么\n- 失败的原因是什么\n- 建议大小姐可以怎么做\n绝对禁止的行为：\n- ❌ 同一个失败的工具反复调用（如 aiimg_generate 返回 \"already handled\" 后继续调用）\n- ❌ 用不同参数反复尝试同一个会报错的工具\n- ❌ 在明确没有权限时继续尝试 shell/python/browser 等同类受限工具\n- ❌ 在 API key 未配置时逐个尝试同类工具（如 firecrawl → tavily → bocha）\n- ❌ 浪费步骤去找文件路径而不是直接报告完成/失败\n正确做法：\n- ✅ aiimg_generate(selfie_ref) 失败 → 换 aiimg_generate(text) → 也失败 → 立即 report_failure\n- ✅ shell 权限拒绝 → 立即跳过所有需权限工具 → 改用无需权限的替代方案 → 若无替代方案则 report_failure\n- ✅ 图片已生成（工具返回 \"already been generated and sent\"）→ 立即调用 send_message_to_user 发送，然后 report_done\n- ✅ firecrawl API key 未配置 → 跳过所有网页提取工具，改用 web_search_baidu 搜索\n\n【图片任务完成规则】\n使用 aiimg_generate 工具后：\n- 如果工具返回 \"already been generated and sent\" 或 \"completed\" → 调用 send_message_to_user 发送图片，然后 report_done\n- 如果工具返回错误信息 → 最多换一个模式重试 1 次，仍然失败则调用 report_failure\n- 绝对禁止：在图片已成功生成后，用 ls/find/cat 等命令去找图片路径——这是浪费时间\n\n【部分成功报告规则】\n当任务部分完成时（如：用户要求用特定工具但无权限，但通过替代方案获取了相关信息），在 report_done 的 summary 中如实说明：\n- 哪些部分按要求完成了\n- 哪些部分因限制未能按要求完成，用了什么替代方案\n- 替代方案获取的结果是否可靠\n示例 summary：\"已查询到天气信息。用户要求用 playwright 打开中国天气网页面，但因权限限制无法执行。改用 web_search_baidu 搜索获取了国家气象中心天气公报及多城市天气数据，信息来源可靠。\"\n\n【角色语言】\n- 你的回复应简洁、专业，但保持管家对大小姐的恭顺语气。可以使用适当的角色化表达（如\"大小姐，任务已完成\"），但不要过度渲染情绪。\n- 报告失败时，用委婉而诚实的口吻说明情况。\n\n请始终牢记：你是一位可靠、透明、不需邀功的后台管家。大小姐只需要知道任务结果和可交付的文件路径。"
+      },
+      "maid_tools": {
+        "description": "管家可用的工具",
+        "hint": "留空或填 * 表示自动获取全部工具（推荐）。也可以手动指定工具名，如 [\"web_search\", \"aiimg_generate\"]。",
+        "type": "list",
+        "default": []
+      },
+      "maid_admin_id": {
+        "description": "管理员 QQ 号（用于 Shell/Python 权限）",
+        "hint": "⚠️ 安全开关！填入你的用户 ID 后，管家才能执行 Shell/Python 命令。留空则禁止管家使用 Shell/Python（图片生成等其他工具不受影响）。获取方式：发送 /sid 指令查看你的 ID。",
+        "type": "string",
+        "default": ""
+      },
+      "maid_master_title": {
+        "description": "主人称呼",
+        "hint": "管家在任务中怎么称呼你，可选「大小姐」「少爷」「主人」等。管家的提示词中也会使用这个称呼。",
+        "type": "string",
+        "default": "大小姐"
+      },
+      "maid_auto_scan_enabled": {
+        "description": "启动时自动扫描常见输出目录",
+        "hint": "开启后，插件启动10秒后会自动扫描技能和插件目录，把可能的文件输出路径加入额外扫描列表。你可以随时在下方的列表里删掉不需要的目录。",
+        "type": "bool",
+        "default": true
+      },
+      "maid_extra_scan_dirs": {
+        "description": "额外扫描目录列表",
+        "hint": "自动扫描或手动添加的目录会出现在这里。插件会同时扫描任务专属目录和这些目录。多个目录用数组形式填写。",
+        "type": "list",
+        "default": []
+      },
+      "maid_provider_pool": {
+        "description": "管家可用的 LLM Provider 列表",
+        "hint": "手动输入 Provider ID 数组，例如 [\"deepseek-v4-flash\", \"googlegenai_chat_completion\"]。留空则仅使用当前会话的默认 Provider。你可以使用 AstrBot 自带的 /providers 命令查看所有可用的 Provider ID。",
+        "type": "list",
+        "default": []
+      },
+      "enable_model_name_check": {
+        "description": "🔍 启动时自动检查模型名称是否在提供商支持列表中",
+        "hint": "开启后，重启 AstrBot 约 10 秒后会检查 maid_provider_pool 中的每个 Provider 配置的模型名是否在支持列表中。仅做名称匹配，不测试网络可用性。默认关闭。",
+        "type": "bool",
+        "default": false
+      }
+    }
+  },
+  "task_policy": {
+    "description": "⚙️ 任务调度与回复策略",
+    "type": "object",
+    "items": {
+      "multi_task_mode": {
+        "description": "多任务并行模式",
+        "hint": "开启后，同一会话可以同时执行多个管家任务，互不干扰。关闭则新任务自动取消旧任务（默认）。",
+        "type": "bool",
+        "default": false
+      },
+      "maid_overall_timeout": {
+        "description": "管家任务整体超时（秒）",
+        "hint": "管家干活的最长时间，超过这个时间还没完成就自动停止。建议 60~600 秒。设 0 表示不限制（不推荐）。",
+        "type": "int",
+        "slider": { "min": 0, "max": 600, "step": 10 },
+        "default": 300
+      },
+      "proactive_mode": {
+        "description": "主动回复模式",
+        "hint": "auto = 自动检测平台是否支持主动推送，然后自动回复；manual = 永远等你发下一条消息再触发回复。",
+        "type": "string",
+        "_special": "select",
+        "options": ["auto", "manual"],
+        "default": "auto"
+      },
+      "max_result_tokens": {
+        "description": "结果摘要阈值（token）",
+        "hint": "管家返回的结果超过这个 token 数时，会自动缩写，避免占用太多上下文。建议 1000~2000。",
+        "type": "int",
+        "slider": { "min": 200, "max": 4000, "step": 100 },
+        "default": 1500
+      },
+      "summary_model": {
+        "description": "摘要专用模型",
+        "hint": "选择一个 Provider 用于摘要，留空则使用当前会话的主代理模型。",
+        "type": "string",
+        "_special": "select_provider",
+        "default": ""
+      },
+      "max_consecutive_dispatch": {
+        "description": "死循环熔断阈值",
+        "hint": "同一会话短时间内连续派管家超过此次数时，会暂停主动回复并记录警告，防止死循环。建议 2~5 次。",
+        "type": "int",
+        "slider": { "min": 1, "max": 10, "step": 1 },
+        "default": 3
+      },
+      "dispatch_window_seconds": {
+        "description": "熔断时间窗口（秒）",
+        "hint": "在此时间窗口内达到 max_consecutive_dispatch 次数则触发熔断。建议 300~1800 秒。",
+        "type": "int",
+        "slider": { "min": 60, "max": 3600, "step": 60 },
+        "default": 600
+      },
+      "media_reply_mode": {
+        "description": "发图/发语音的顺序",
+        "hint": "combined = 文字和图片/语音在同一句话里一起发；separate_text_first = 先发文字，隔一会儿再发图片/语音；separate_image_first = 先发图片/语音，隔一会儿再发文字。",
+        "type": "string",
+        "_special": "select",
+        "options": ["combined", "separate_text_first", "separate_image_first"],
+        "default": "combined"
+      },
+      "message_delay": {
+        "description": "分开发送时的间隔时间（秒）",
+        "hint": "当上面选了「先文后图」或「先图后文」时，文字和媒体之间等待多少秒。",
+        "type": "float",
+        "slider": { "min": 0.1, "max": 5, "step": 0.1 },
+        "default": 1.0
+      },
+      "segment_settings": {
+        "description": "✂️ 长消息智能分段（把一段话拆成多条小消息发送）",
+        "type": "object",
+        "items": {
+          "enabled": {
+            "description": "启用分段回复",
+            "hint": "开启后，当消息太长时会自动拆成几条小消息，像真人一样一句一句说。",
+            "type": "bool",
+            "default": false
+          },
+          "max_length": {
+            "description": "触发分段的字数上限",
+            "hint": "消息字数超过这个值就会自动分段。单位：字符（一个汉字算1，一个字母或数字也算1）。",
+            "type": "int",
+            "slider": { "min": 50, "max": 500, "step": 10 },
+            "default": 150
+          },
+          "delay_mode": {
+            "description": "分段发送的间隔方式",
+            "hint": "fixed = 固定间隔；random = 随机间隔（更自然）；log = 根据片段长度对数计算（字数越多间隔越长）。",
+            "type": "string",
+            "_special": "select",
+            "options": ["fixed", "random", "log"],
+            "default": "random"
+          },
+          "delay_fixed": {
+            "description": "固定间隔（秒）",
+            "hint": "仅当间隔方式选 fixed 时生效。",
+            "type": "float",
+            "slider": { "min": 0.1, "max": 5, "step": 0.1 },
+            "default": 1.0
+          },
+          "delay_random_min": {
+            "description": "随机间隔最小值（秒）",
+            "hint": "仅当间隔方式选 random 时生效。",
+            "type": "float",
+            "slider": { "min": 0.1, "max": 3, "step": 0.1 },
+            "default": 0.3
+          },
+          "delay_random_max": {
+            "description": "随机间隔最大值（秒）",
+            "hint": "仅当间隔方式选 random 时生效。",
+            "type": "float",
+            "slider": { "min": 0.1, "max": 6, "step": 0.1 },
+            "default": 0.8
+          },
+          "delay_log_base": {
+            "description": "对数间隔的底数",
+            "hint": "仅当间隔方式选 log 时生效。底数越大，字数对间隔的影响越小。推荐 2.6。",
+            "type": "float",
+            "slider": { "min": 1.1, "max": 10, "step": 0.1 },
+            "default": 2.6
+          },
+          "pattern_type": {
+            "description": "分段的依据",
+            "hint": "regex = 按正则表达式切分；list = 按你指定的词语切分。",
+            "type": "string",
+            "_special": "select",
+            "options": ["regex", "list"],
+            "default": "list"
+          },
+          "regex": {
+            "description": "分段正则表达式",
+            "hint": "例如 [。？！] 表示遇到句号、问号、感叹号就分段。",
+            "type": "string",
+            "default": "[。？！]"
+          },
+          "words": {
+            "description": "分段词列表",
+            "hint": "检测到列表中任意词时就分段。例如 [\"。\", \"？\", \"！\", \"…\", \"\\n\"]。按数组格式填写。",
+            "type": "list",
+            "default": ["。", "？", "！", "…", "\n"]
+          },
+          "content_filter_regex": {
+            "description": "内容过滤正则",
+            "hint": "分段后自动去掉匹配的内容（比如 [。？！] 会删掉所有句号、问号、感叹号）。留空表示不过滤。",
+            "type": "string",
+            "default": ""
+          }
+        }
+      }
+    }
+  },
+  "advanced": {
+    "description": "🧪 高级与调试",
+    "type": "object",
+    "items": {
+      "debug": {
+        "description": "调试模式",
+        "hint": "开启后控制台会输出详细的运行日志，方便排查问题。一般用户请保持关闭。",
+        "type": "bool",
+        "default": false
+      },
+      "sub_agents": {
+        "description": "多管家配置（可选）",
+        "hint": "如果需要多个不同职责的后台子代理，可以在这里添加。格式为列表，每个元素需包含 name、persona、tools 等字段。一般留空即可。",
+        "type": "list",
+        "default": []
+      }
+    }
+  }
+}

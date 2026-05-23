@@ -1,0 +1,16 @@
+name: astrbot_plugin_transparent_maid
+display_name: 铃兰女仆
+author: NekoTumble
+version: "1.0.0"
+description: 一位默默在幕后的女仆管家。主代理派她无声干活，她默默完成所有任务后，优雅地退到幕后让主代理向你转达结果。支持多任务并行、内控工具、自动媒体收集与去重。
+homepage: https://github.com/NekoTumble/astrbot_plugin_transparent_maid
+repo: https://github.com/NekoTumble/astrbot_plugin_transparent_maid
+astrbot_version: ">=4.24.0"
+support_platforms:
+  - aiocqhttp
+tags:
+  - 女仆
+  - 管家
+  - 子代理
+  - 异步
+  - 后台
